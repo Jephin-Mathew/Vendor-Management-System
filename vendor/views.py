@@ -1,0 +1,301 @@
+from django.db.models import Avg, Count
+from rest_framework.decorators import api_view, permission_classes, authentication_classes
+from rest_framework.permissions import AllowAny
+from rest_framework.response import Response
+from rest_framework import status
+from .models import Vendor, PurchaseOrder
+from datetime import datetime, timedelta, timezone
+from .serializers import VendorSerializer, PurchaseOrderSerializer
+from rest_framework.authentication import TokenAuthentication
+from rest_framework.permissions import IsAuthenticated
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+@authentication_classes([TokenAuthentication])
+def simple_api(request):
+    return Response({'text': 'Hello world, This is your first API call'}, status=status.HTTP_200_OK)
+
+# Vendor Profile Management
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@authentication_classes([TokenAuthentication])
+def vendor_create(request):
+    serializer = VendorSerializer(data=request.data)
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+@authentication_classes([TokenAuthentication])
+def vendor_list(request):
+    vendors = Vendor.objects.all()
+    serializer = VendorSerializer(vendors, many=True)
+    return Response(serializer.data)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+@authentication_classes([TokenAuthentication])
+def vendor_detail_get(request, pk):
+    try:
+        vendor = Vendor.objects.get(pk=pk)
+        serializer = VendorSerializer(vendor)
+        return Response(serializer.data)
+    except Vendor.DoesNotExist:
+        return Response({'error': 'Vendor does not exist'}, status=status.HTTP_404_NOT_FOUND)
+
+
+@api_view(['PUT'])
+@permission_classes([IsAuthenticated])
+@authentication_classes([TokenAuthentication])
+def vendor_detail_put(request, pk):
+    try:
+        vendor = Vendor.objects.get(pk=pk)
+    except Vendor.DoesNotExist:
+        return Response({'error': 'Vendor does not exist'}, status=status.HTTP_404_NOT_FOUND)
+
+    serializer = VendorSerializer(vendor, data=request.data)
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+@authentication_classes([TokenAuthentication])
+def vendor_detail_delete(request, pk):
+    try:
+        vendor = Vendor.objects.get(pk=pk)
+    except Vendor.DoesNotExist:
+        return Response({'error': 'Vendor does not exist'}, status=status.HTTP_404_NOT_FOUND)
+
+    vendor.delete()
+    return Response(status=status.HTTP_204_NO_CONTENT)
+
+# Purchase Order Tracking
+
+# create
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@authentication_classes([TokenAuthentication])
+def purchase_order_create(request):
+    serializer = PurchaseOrderSerializer(data=request.data)
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+# List
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+@authentication_classes([TokenAuthentication])
+def purchase_order_list(request):
+    vendor_id = request.query_params.get('vendor_id')
+    if vendor_id:
+        purchase_orders = PurchaseOrder.objects.filter(vendor=vendor_id)
+    else:
+        purchase_orders = PurchaseOrder.objects.all()
+    serializer = PurchaseOrderSerializer(purchase_orders, many=True)
+    return Response(serializer.data)
+
+# details
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+@authentication_classes([TokenAuthentication])
+def purchase_order_detail_get(request, po_id):
+    try:
+        purchase_order = PurchaseOrder.objects.get(pk=po_id)
+        serializer = PurchaseOrderSerializer(purchase_order)
+        return Response(serializer.data)
+    except PurchaseOrder.DoesNotExist:
+        return Response({'error': 'Purchase order not found'}, status=status.HTTP_404_NOT_FOUND)
+
+# update order details
+
+
+@api_view(['PUT'])
+@permission_classes([IsAuthenticated])
+@authentication_classes([TokenAuthentication])
+def purchase_order_detail_put(request, po_id):
+    try:
+        purchase_order = PurchaseOrder.objects.get(pk=po_id)
+    except PurchaseOrder.DoesNotExist:
+        return Response({'error': 'Purchase order not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    serializer = PurchaseOrderSerializer(purchase_order, data=request.data)
+
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+# Delete
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+@authentication_classes([TokenAuthentication])
+def purchase_order_detail_delete(request, po_id):
+    try:
+        purchase_order = PurchaseOrder.objects.get(pk=po_id)
+    except PurchaseOrder.DoesNotExist:
+        return Response({'error': 'Purchase order not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    purchase_order.delete()
+    return Response(status=status.HTTP_204_NO_CONTENT)
+
+# Vendor Performance Evaluation
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+@authentication_classes([TokenAuthentication])
+def vendor_performance(request, vendor_id):
+    try:
+        vendor = Vendor.objects.get(pk=vendor_id)
+    except Vendor.DoesNotExist:
+        return Response({'error': 'Vendor not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    on_time_deliveries = PurchaseOrder.objects.filter(
+        vendor=vendor,
+        status='completed',
+        is_on_time_delivery=True
+    ).count()
+
+    total_completed_orders = PurchaseOrder.objects.filter(
+        vendor=vendor,
+        status='completed'
+    ).count()
+
+    on_time_delivery_rate = (on_time_deliveries / total_completed_orders) * \
+        100 if total_completed_orders != 0 else 0
+
+    avg_quality = avg_quality_rating(vendor)
+    avg_response = avg_response_time(vendor)
+    fulfilment = fulfilment_rate(vendor)
+
+    return Response({
+        'on_time_delivery_rate': on_time_delivery_rate,
+        'avg_quality': avg_quality,
+        'avg_response': avg_response,
+        'fulfilment': fulfilment,
+    })
+
+# Update Acknowledgment Endpoint
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@authentication_classes([TokenAuthentication])
+def acknowledge_purchase_order(request, po_id):
+    try:
+        purchase_order = PurchaseOrder.objects.get(pk=po_id)
+    except PurchaseOrder.DoesNotExist:
+        return Response({'error': 'Purchase order not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    serializer = PurchaseOrderSerializer(purchase_order, data=request.data)
+
+    if purchase_order.status == 'completed':
+        calculate_on_time_delivery_rate(
+            purchase_order.vendor, purchase_order.is_on_time_delivery)
+        avg_response = avg_response_time(purchase_order.vendor)
+
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+def calculate_on_time_delivery_rate(vendor, is_on_time_delivery):
+    total_completed_orders = PurchaseOrder.objects.filter(
+        vendor=vendor,
+        status='completed'
+    ).count()
+
+    on_time_deliveries = PurchaseOrder.objects.filter(
+        vendor=vendor,
+        status='completed',
+        is_on_time_delivery=True
+    ).count()
+
+    if total_completed_orders != 0:
+        on_time_delivery_rate = (
+            on_time_deliveries / total_completed_orders) * 100
+    else:
+        on_time_delivery_rate = 0
+
+    vendor.on_time_delivery_rate = on_time_delivery_rate
+    vendor.save()
+
+    return vendor.on_time_delivery_rate
+
+
+def avg_quality_rating(vendor):
+    completed_orders = PurchaseOrder.objects.filter(
+        vendor=vendor, status='completed', quality_rating__isnull=False)
+    total_quality_rating = completed_orders.aggregate(
+        Avg('quality_rating'))['quality_rating__avg']
+    return total_quality_rating
+
+
+def avg_response_time(vendor):
+    completed_orders = PurchaseOrder.objects.filter(
+        vendor=vendor,
+        status='completed',
+        acknowledgment_date__isnull=False,
+        issue_date__isnull=False
+    )
+
+    total_response_time = sum(
+        (
+            datetime.combine(
+                order.acknowledgment_date,
+                datetime.min.time(),
+                tzinfo=timezone.utc
+            )
+            - order.issue_date
+        ).days
+        for order in completed_orders
+    )
+
+    total_completed_orders = completed_orders.count()
+
+    if total_completed_orders != 0:
+        average_response_time = total_response_time / total_completed_orders
+    else:
+        average_response_time = 0
+
+    vendor.average_response_time = average_response_time
+    vendor.save()
+
+    return vendor.average_response_time
+
+
+def fulfilment_rate(vendor):
+    fulfilled_orders = PurchaseOrder.objects.filter(
+        vendor=vendor, status='completed', issue_date__isnull=False)
+    total_orders = PurchaseOrder.objects.filter(
+        vendor=vendor,
+        issue_date__isnull=False
+    ).count()
+
+    if total_orders != 0:
+        fulfillment_rate = (fulfilled_orders.count() / total_orders) * 100
+    else:
+        fulfillment_rate = 0
+
+    vendor.fulfillment_rate = fulfillment_rate
+    vendor.save()
