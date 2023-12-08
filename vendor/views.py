@@ -8,41 +8,55 @@ from datetime import datetime, timedelta, timezone
 from .serializers import VendorSerializer, PurchaseOrderSerializer
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.permissions import IsAuthenticated
-
-
-@api_view(["POST"])
-@permission_classes([IsAuthenticated])
-@authentication_classes([TokenAuthentication])
-def simple_api(request):
-    return Response({'text': 'Hello world, This is your first API call'}, status=status.HTTP_200_OK)
+from datetime import datetime
+from django.conf import settings
 
 # Vendor Profile Management
 
+# create
+
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
-@authentication_classes([TokenAuthentication])
+@permission_classes([])
 def vendor_create(request):
+    if not auth_token(request):
+        return Response({'error': 'Unauthorized token'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    request.data.setdefault('on_time_delivery_rate', 0)
+    request.data.setdefault('quality_rating_avg', 0)
+    request.data.setdefault('average_response_time', 0)
+    request.data.setdefault('fulfillment_rate', 0)
+
     serializer = VendorSerializer(data=request.data)
+
     if serializer.is_valid():
         serializer.save()
         return Response(serializer.data, status=status.HTTP_201_CREATED)
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    else:
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+# list
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
-@authentication_classes([TokenAuthentication])
 def vendor_list(request):
-    vendors = Vendor.objects.all()
-    serializer = VendorSerializer(vendors, many=True)
-    return Response(serializer.data)
+    if auth_token(request):
+        vendors = Vendor.objects.all()
+        serializer = VendorSerializer(vendors, many=True)
+        return Response(serializer.data)
+    else:
+        return Response({'error': 'Unauthorized token'}, status=status.HTTP_401_UNAUTHORIZED)
+
+
+# List specific
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
-@authentication_classes([TokenAuthentication])
 def vendor_detail_get(request, pk):
+    if not auth_token(request):
+        return Response({'error': 'Unauthorized token'}, status=status.HTTP_401_UNAUTHORIZED)
+
     try:
         vendor = Vendor.objects.get(pk=pk)
         serializer = VendorSerializer(vendor)
@@ -51,26 +65,40 @@ def vendor_detail_get(request, pk):
         return Response({'error': 'Vendor does not exist'}, status=status.HTTP_404_NOT_FOUND)
 
 
+# Update
+
+
 @api_view(['PUT'])
-@permission_classes([IsAuthenticated])
-@authentication_classes([TokenAuthentication])
 def vendor_detail_put(request, pk):
+    if not auth_token(request):
+        return Response({'error': 'Unauthorized token'}, status=status.HTTP_401_UNAUTHORIZED)
+
     try:
         vendor = Vendor.objects.get(pk=pk)
     except Vendor.DoesNotExist:
         return Response({'error': 'Vendor does not exist'}, status=status.HTTP_404_NOT_FOUND)
 
+    request.data.setdefault('on_time_delivery_rate', 0)
+    request.data.setdefault('quality_rating_avg', 0)
+    request.data.setdefault('average_response_time', 0)
+    request.data.setdefault('fulfillment_rate', 0)
+
     serializer = VendorSerializer(vendor, data=request.data)
+
     if serializer.is_valid():
         serializer.save()
         return Response(serializer.data)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+# Delete
+
+
 @api_view(['DELETE'])
-@permission_classes([IsAuthenticated])
-@authentication_classes([TokenAuthentication])
 def vendor_detail_delete(request, pk):
+    if not auth_token(request):
+        return Response({'error': 'Unauthorized token'}, status=status.HTTP_401_UNAUTHORIZED)
+
     try:
         vendor = Vendor.objects.get(pk=pk)
     except Vendor.DoesNotExist:
@@ -85,37 +113,46 @@ def vendor_detail_delete(request, pk):
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
-@authentication_classes([TokenAuthentication])
 def purchase_order_create(request):
+    if not auth_token(request):
+        return Response({'error': 'Unauthorized token'}, status=status.HTTP_401_UNAUTHORIZED)
+
     serializer = PurchaseOrderSerializer(data=request.data)
+
     if serializer.is_valid():
         serializer.save()
         return Response(serializer.data, status=status.HTTP_201_CREATED)
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    else:
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 # List
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
-@authentication_classes([TokenAuthentication])
 def purchase_order_list(request):
+    if not auth_token(request):
+        return Response({'error': 'Unauthorized token'}, status=status.HTTP_401_UNAUTHORIZED)
+
     vendor_id = request.query_params.get('vendor_id')
-    if vendor_id:
-        purchase_orders = PurchaseOrder.objects.filter(vendor=vendor_id)
-    else:
+
+    if not vendor_id:
         purchase_orders = PurchaseOrder.objects.all()
+    else:
+        purchase_orders = PurchaseOrder.objects.filter(vendor=vendor_id)
+
     serializer = PurchaseOrderSerializer(purchase_orders, many=True)
     return Response(serializer.data)
+
 
 # details
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
-@authentication_classes([TokenAuthentication])
 def purchase_order_detail_get(request, po_id):
+    if not auth_token(request):
+        return Response({'error': 'Unauthorized token'}, status=status.HTTP_401_UNAUTHORIZED)
+
     try:
         purchase_order = PurchaseOrder.objects.get(pk=po_id)
         serializer = PurchaseOrderSerializer(purchase_order)
@@ -127,9 +164,9 @@ def purchase_order_detail_get(request, po_id):
 
 
 @api_view(['PUT'])
-@permission_classes([IsAuthenticated])
-@authentication_classes([TokenAuthentication])
 def purchase_order_detail_put(request, po_id):
+    if not auth_token(request):
+        return Response({'error': 'Unauthorized token'}, status=status.HTTP_401_UNAUTHORIZED)
     try:
         purchase_order = PurchaseOrder.objects.get(pk=po_id)
     except PurchaseOrder.DoesNotExist:
@@ -146,9 +183,9 @@ def purchase_order_detail_put(request, po_id):
 
 
 @api_view(['DELETE'])
-@permission_classes([IsAuthenticated])
-@authentication_classes([TokenAuthentication])
 def purchase_order_detail_delete(request, po_id):
+    if not auth_token(request):
+        return Response({'error': 'Unauthorized token'}, status=status.HTTP_401_UNAUTHORIZED)
     try:
         purchase_order = PurchaseOrder.objects.get(pk=po_id)
     except PurchaseOrder.DoesNotExist:
@@ -161,9 +198,9 @@ def purchase_order_detail_delete(request, po_id):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
-@authentication_classes([TokenAuthentication])
 def vendor_performance(request, vendor_id):
+    if not auth_token(request):
+        return Response({'error': 'Unauthorized token'}, status=status.HTTP_401_UNAUTHORIZED)
     try:
         vendor = Vendor.objects.get(pk=vendor_id)
     except Vendor.DoesNotExist:
@@ -198,49 +235,19 @@ def vendor_performance(request, vendor_id):
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
-@authentication_classes([TokenAuthentication])
 def acknowledge_purchase_order(request, po_id):
+    if not auth_token(request):
+        return Response({'error': 'Unauthorized token'}, status=status.HTTP_401_UNAUTHORIZED)
     try:
         purchase_order = PurchaseOrder.objects.get(pk=po_id)
     except PurchaseOrder.DoesNotExist:
         return Response({'error': 'Purchase order not found'}, status=status.HTTP_404_NOT_FOUND)
 
-    serializer = PurchaseOrderSerializer(purchase_order, data=request.data)
+    purchase_order.acknowledgment_date = datetime.now()
+    purchase_order.save()
+    return Response({'success': 'Purchase order acknowledged successfully'})
 
-    if purchase_order.status == 'completed':
-        calculate_on_time_delivery_rate(
-            purchase_order.vendor, purchase_order.is_on_time_delivery)
-        avg_response = avg_response_time(purchase_order.vendor)
-
-    if serializer.is_valid():
-        serializer.save()
-        return Response(serializer.data)
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
-def calculate_on_time_delivery_rate(vendor, is_on_time_delivery):
-    total_completed_orders = PurchaseOrder.objects.filter(
-        vendor=vendor,
-        status='completed'
-    ).count()
-
-    on_time_deliveries = PurchaseOrder.objects.filter(
-        vendor=vendor,
-        status='completed',
-        is_on_time_delivery=True
-    ).count()
-
-    if total_completed_orders != 0:
-        on_time_delivery_rate = (
-            on_time_deliveries / total_completed_orders) * 100
-    else:
-        on_time_delivery_rate = 0
-
-    vendor.on_time_delivery_rate = on_time_delivery_rate
-    vendor.save()
-
-    return vendor.on_time_delivery_rate
+# metrics
 
 
 def avg_quality_rating(vendor):
@@ -248,7 +255,7 @@ def avg_quality_rating(vendor):
         vendor=vendor, status='completed', quality_rating__isnull=False)
     total_quality_rating = completed_orders.aggregate(
         Avg('quality_rating'))['quality_rating__avg']
-    return total_quality_rating
+    return total_quality_rating or 0
 
 
 def avg_response_time(vendor):
@@ -299,3 +306,15 @@ def fulfilment_rate(vendor):
 
     vendor.fulfillment_rate = fulfillment_rate
     vendor.save()
+
+
+# Authentication
+def auth_token(request):
+    auth_header = request.headers.get('Authorization')
+    if not auth_header or not auth_header.startswith('Token '):
+        return False
+    token = auth_header.split(' ')[1]
+    if token == 'a74336a3ea0b76239abd630e2bda5142d7f12972':
+        return True
+    else:
+        return False

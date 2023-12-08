@@ -2,7 +2,6 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
-    path('simpleapi/', views.simple_api, name='simple_api'),
     # Vendor Profile Management
     path('vendor/create/', views.vendor_create, name='vendor_create'),
     path('vendor/', views.vendor_list, name='vendor_list'),

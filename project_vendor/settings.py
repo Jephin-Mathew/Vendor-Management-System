@@ -90,14 +90,10 @@ DATABASES = {
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
-        'rest_framework.authentication.TokenAuthentication',
     ),
-    'DEFAULT_PERMISSION_CLASSES': (
-        'rest_framework.permissions.DjangoModelPermissionsOrAnonReadOnly',
-        'rest_framework.permissions.IsAuthenticated', )
+    'DEFAULT_PERMISSION_CLASSES': ()
 }
-
-TOKEN = 'a74336a3ea0b76239abd630e2bda5142d7f12972'
+TOKEN = ['a74336a3ea0b76239abd630e2bda5142d7f12972']
 # Password validation
 # https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators
 
